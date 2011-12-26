@@ -104,7 +104,7 @@
                  (setf constants (nreverse constants)
                        others    (nreverse others))
                  (cond ((rest others)
-                        (push `(* (* ,literal ,@constants) ,@others) noise))
+                        (push `(* ,@others (* ,literal ,@constants)) noise))
                        ((and constants others)
                         (push (first others)
                               (gethash `(* ,literal ,@constants) terms)))
