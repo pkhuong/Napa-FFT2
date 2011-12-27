@@ -109,14 +109,14 @@
                (@dst 7) (- a b)))
        ,dst)))
 
-(defun gen-fft/n (size &rest args
-                  &key (dst 'dst)
-                    (src 'src)
-                    (startd 'startd)
-                    (strided 1)
-                    (starts 'starts)
-                    (strides 1)
-                    (twiddle 'twiddle))
+(defun gen-fft/small (size &rest args
+                      &key (dst 'dst)
+                        (src 'src)
+                        (startd 'startd)
+                        (strided 1)
+                        (starts 'starts)
+                        (strides 1)
+                        (twiddle 'twiddle))
   (check-type size (integer 1))
   (case size
     (1
@@ -131,13 +131,13 @@
      (let ((2*strides (* 2 strides))
            (size/2    (truncate size 2)))
        `(flet ((rec (startd starts)
-                 ,(gen-fft/n size/2
-                             :dst dst
-                             :src src
-                             :startd 'startd
-                             :starts 'starts
-                             :strides 2*strides
-                             :strided strided)))
+                 ,(gen-fft/small size/2
+                                 :dst dst
+                                 :src src
+                                 :startd 'startd
+                                 :starts 'starts
+                                 :strides 2*strides
+                                 :strided strided)))
           (rec ,startd ,starts)
           (rec (+ ,startd ,size/2)
                (+ ,starts ,strides))
