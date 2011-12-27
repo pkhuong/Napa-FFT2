@@ -1,4 +1,4 @@
-(defconstant +blocking-factor+ 1)
+(defconstant +blocking-factor+ 4)
 
 (defun gen-simple-fft/medium (size
                               &key (dst 'dst)
@@ -20,30 +20,52 @@
               (declare (type complex-sample-array dst src twiddle)
                        (type index startd starts))
               ,(gen-fft/small half-size)))
-       (loop for i of-type index below ,half-size
-             for j of-type index from 0 by ,half-size
+       (loop for i of-type index below ,half-size by ,+blocking-factor+
+             for j of-type index from 0 by ,(* +blocking-factor+ half-size)
              do (loop for count of-type index from ,half-size above 0
                       for j from ,startt
                       for k of-type index from (+ i ,starts) by ,half-size
-                      do (setf (ref ,tmp j) (ref ,src (* k ,strides))))
-                (sub-fft ,dst ,tmp ,twiddle (+ j ,startd) ,startt)
-                (loop for i of-type index from (+ j ,startd)
-                      for idx of-type index from j
-                      for count below ,half-size
-                      do (setf (ref ,dst i)
-                               (* (ref ,dst i)
-                                  (ref ,cooley-tukey idx)))))
-       (loop for i of-type index below ,half-size do
+                      do (setf ,@(loop
+                                   for block below +blocking-factor+
+                                   append
+                                   `((ref ,tmp (+ j ,(* block half-size)))
+                                     (ref ,src (+ (* (+ k ,block) ,strides)))))))
+             do (progn
+                  ,@(loop
+                      for block below +blocking-factor+
+                      collect
+                      `(sub-fft ,dst ,tmp ,twiddle
+                                (+ j ,startd ,(* block half-size))
+                                (+ ,startt ,(* block half-size))))
+                  (loop for i of-type index from (+ j ,startd)
+                        for idx of-type index from j
+                        for count below ,(* half-size +blocking-factor+)
+                        do (setf (ref ,dst i)
+                                 (* (ref ,dst i)
+                                    (ref ,cooley-tukey idx))))))
+       (loop for i of-type index below ,half-size by +blocking-factor+ do
          (loop for count from ,half-size above 0
                for j of-type index from ,startt
                for k of-type index from (+ i ,startd) by ,half-size
-               do (setf (ref ,tmp j) (ref ,dst k)))
-         (sub-fft ,tmp ,tmp ,twiddle
-                  (+ ,startt ,half-size) ,startt)
-         (loop for count from ,half-size above 0
-               for j of-type index from (+ ,startt ,half-size)
-               for k of-type index from (+ i ,startd) by ,half-size
-               do (setf (ref ,dst k) (ref ,tmp j))))
+               do (setf ,@(loop
+                            for block below +blocking-factor+
+                            append `((ref ,tmp (+ j ,(* block half-size)))
+                                     (ref ,dst (+ k ,block))))))
+         do
+         (progn
+           ,@(loop for block below +blocking-factor+
+                   collect
+                   `(sub-fft ,tmp ,tmp ,twiddle
+                             (+ ,startt ,(* +blocking-factor+ half-size)
+                                        ,(* block half-size))
+                             (+ ,startt ,(* block half-size))))
+           (loop for count from ,half-size above 0
+                 for j of-type index from (+ ,startt ,(* +blocking-factor+ half-size))
+                 for k of-type index from (+ i ,startd) by ,half-size
+                 do (setf ,@(loop
+                              for block below +blocking-factor+
+                              append `((ref ,dst (+ k ,block)) (ref ,tmp
+                                                                    (+ j ,(* block half-size)))))))))
        dst)))
 
 (defun gen-generic-fft/medium (size
