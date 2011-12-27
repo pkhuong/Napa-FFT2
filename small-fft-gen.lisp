@@ -157,28 +157,24 @@
                                          (b (ref ,dst (+ ,startd (* ,j ,strided)))))
                                      (setf (ref ,dst (+ ,startd (* ,i ,strided))) (+ a b)
                                            (ref ,dst (+ ,startd (* ,j ,strided))) (- a b)))))
-                `((loop for .src. of-type index
-                          from (+ ,startd ,size/2) by 2
-                        for .c. of-type fixnum from ,size/2 by 2
-                        for .count. of-type index from ,(truncate size/2 2) above 0
+                `((loop for .src. of-type index from (+ ,startd ,size/2) by 2
+                        for .c. of-type index from ,size/2 below ,size by 2
                         do (let ((i0 (ref ,dst .src.))
                                  (i1 (ref ,dst (+ 1 .src.)))
                                  (c0 (ref twiddle .c.))
                                  (c1 (ref twiddle (+ 1 .c.))))
                              (setf (ref ,dst       .src.) (* i0 c0)
                                    (ref ,dst (+ 1 .src.)) (* i1 c1))))
-                  (loop for i of-type index
-                          from ,startd by 2
-                        for j of-type index
-                          from (+ ,startd ,size/2) by 2
-                        for .count. of-type index from ,(truncate size/2 2) above 0
-                        do
-                        (let ((a0 (ref ,dst i))
-                              (b0 (ref ,dst j))
-                              (a1 (ref ,dst (+ i 1)))
-                              (b1 (ref ,dst (+ j 1))))
-                          (setf (ref ,dst i)       (+ a0 b0)
-                                (ref ,dst j)       (- a0 b0)
-                                (ref ,dst (+ 1 i)) (+ a1 b1)
-                                (ref ,dst (+ 1 j)) (- a1 b1))))))
+                  (loop for i of-type index from ,startd by 2
+                        for j of-type index from (+ ,startd ,size/2) by 2
+                        for .count. of-type index
+                          from ,(truncate size/2 2) above 0
+                        do (let ((a0 (ref ,dst i))
+                                 (b0 (ref ,dst j))
+                                 (a1 (ref ,dst (+ i 1)))
+                                 (b1 (ref ,dst (+ j 1))))
+                             (setf (ref ,dst i)       (+ a0 b0)
+                                   (ref ,dst j)       (- a0 b0)
+                                   (ref ,dst (+ 1 i)) (+ a1 b1)
+                                   (ref ,dst (+ 1 j)) (- a1 b1))))))
           ,dst)))))
