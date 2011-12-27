@@ -4,28 +4,24 @@
 
 (defun gen-fft/1 (&key (dst 'dst)
                     (src 'src)
-                    (temp 'temp)
                     (startd 'startd)
                     (strided 1)
                     (starts 'starts)
                     (strides 1)
-                    (startt 'startt)
                     (twiddle 'twiddle))
-  (declare (ignore temp startt strided strides twiddle))
+  (declare (ignore strided strides twiddle))
   `(progn
      (setf (ref ,dst ,startd) (ref ,src ,starts))
      ,dst))
 
 (defun gen-fft/2 (&key (dst 'dst)
                     (src 'src)
-                    (temp 'temp)
                     (startd 'startd)
                     (strided 1)
                     (starts 'starts)
                     (strides 1)
-                    (startt 'startt)
                     (twiddle 'twiddle))
-  (declare (ignore temp startt twiddle))
+  (declare (ignore twiddle))
   `(let ((s0 (ref ,src ,starts))
          (s1 (ref ,src (+ ,starts ,strides))))
      (setf (ref ,dst              ,startd) (+ s0 s1)
@@ -36,14 +32,12 @@
 
 (defun gen-fft/4 (&key (dst 'dst)
                     (src 'src)
-                    (temp 'temp)
                     (startd 'startd)
                     (strided 1)
                     (starts 'starts)
                     (strides 1)
-                    (startt 'startt)
                     (twiddle 'twiddle))
-  (declare (ignore temp startt twiddle))
+  (declare (ignore twiddle))
   `(macrolet ((@src (&optional (index 0))
                 `(ref ,',src (+ ,',starts (* ,index ,',strides))))
               (@dst (&optional (index 0))
@@ -64,13 +58,12 @@
 
 (defun gen-fft/8 (&key (dst 'dst)
                     (src 'src)
-                    (temp 'temp)
                     (startd 'startd)
                     (strided 1)
                     (starts 'starts)
                     (strides 1)
-                    (startt 'startt))
-  (declare (ignore temp startt))
+                    (twiddle 'twiddle))
+  (declare (ignore twiddle))
   `(macrolet ((@src (&optional (index 0))
                 `(ref ,',src (+ ,',starts (* ,index ,',strides))))
               (@dst (&optional (index 0))
@@ -119,12 +112,10 @@
 (defun gen-fft/n (size &rest args
                   &key (dst 'dst)
                     (src 'src)
-                    (temp 'temp)
                     (startd 'startd)
                     (strided 1)
                     (starts 'starts)
                     (strides 1)
-                    (startt 'startt)
                     (twiddle 'twiddle))
   (check-type size (integer 1))
   (case size
@@ -139,26 +130,22 @@
     (t
      (let ((2*strides (* 2 strides))
            (size/2    (truncate size 2)))
-       `(flet ((rec (startd starts startt)
-                 (declare (ignorable startt))
+       `(flet ((rec (startd starts)
                  ,(gen-fft/n size/2
-                             :dst temp
+                             :dst dst
                              :src src
-                             :temp dst
                              :startd 'startd
                              :starts 'starts
                              :strides 2*strides
-                             :strided strided
-                             :startt 'startt)))
-          (rec ,startt ,starts ,startd)
-          (rec (+ ,startt ,size/2)
-               (+ ,starts ,strides)
-               (+ ,startd ,size/2))
+                             :strided strided)))
+          (rec ,startd ,starts)
+          (rec (+ ,startd ,size/2)
+               (+ ,starts ,strides))
           ,@(if (<= size 16)
                 `(,@(loop for idx below size/2
                           for i from size/2
                           for root = (/ (- idx) size)
-                          for place = `(ref ,temp (+ ,startt (* ,i ,strided)))
+                          for place = `(ref ,dst (+ ,startd (* ,i ,strided)))
                           unless (zerop idx)
                             collect
                           `(setf ,place
@@ -166,36 +153,32 @@
                   ,@(loop repeat size/2
                           for i from 0
                           for j from size/2
-                          collect `(let ((a (ref ,temp (+ ,startt (* ,i ,strided))))
-                                         (b (ref ,temp (+ ,startt (* ,j ,strided)))))
+                          collect `(let ((a (ref ,dst (+ ,startd (* ,i ,strided))))
+                                         (b (ref ,dst (+ ,startd (* ,j ,strided)))))
                                      (setf (ref ,dst (+ ,startd (* ,i ,strided))) (+ a b)
                                            (ref ,dst (+ ,startd (* ,j ,strided))) (- a b)))))
                 `((loop for .src. of-type index
-                          from (+ ,startt ,size/2) by 2
+                          from (+ ,startd ,size/2) by 2
                         for .c. of-type fixnum from ,size/2 by 2
                         for .count. of-type index from ,(truncate size/2 2) above 0
-                        do (let ((i0 (ref ,temp .src.))
-                                 (i1 (ref ,temp (+ 1 .src.)))
+                        do (let ((i0 (ref ,dst .src.))
+                                 (i1 (ref ,dst (+ 1 .src.)))
                                  (c0 (ref twiddle .c.))
                                  (c1 (ref twiddle (+ 1 .c.))))
-                             (setf (ref ,temp       .src.) (* i0 c0)
-                                   (ref ,temp (+ 1 .src.)) (* i1 c1))))
-                  (loop for dst-i of-type index
+                             (setf (ref ,dst       .src.) (* i0 c0)
+                                   (ref ,dst (+ 1 .src.)) (* i1 c1))))
+                  (loop for i of-type index
                           from ,startd by 2
-                        for dst-j of-type index
+                        for j of-type index
                           from (+ ,startd ,size/2) by 2
-                        for src-i of-type index
-                          from ,startt by 2
-                        for src-j of-type index
-                          from (+ ,startt ,size/2) by 2
                         for .count. of-type index from ,(truncate size/2 2) above 0
                         do
-                        (let ((a0 (ref ,temp src-i))
-                              (b0 (ref ,temp src-j))
-                              (a1 (ref ,temp (+ src-i 1)))
-                              (b1 (ref ,temp (+ src-j 1))))
-                          (setf (ref ,dst dst-i)       (+ a0 b0)
-                                (ref ,dst dst-j)       (- a0 b0)
-                                (ref ,dst (+ 1 dst-i)) (+ a1 b1)
-                                (ref ,dst (+ 1 dst-j)) (- a1 b1))))))
+                        (let ((a0 (ref ,dst i))
+                              (b0 (ref ,dst j))
+                              (a1 (ref ,dst (+ i 1)))
+                              (b1 (ref ,dst (+ j 1))))
+                          (setf (ref ,dst i)       (+ a0 b0)
+                                (ref ,dst j)       (- a0 b0)
+                                (ref ,dst (+ 1 i)) (+ a1 b1)
+                                (ref ,dst (+ 1 j)) (- a1 b1))))))
           ,dst)))))
