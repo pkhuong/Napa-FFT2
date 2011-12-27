@@ -1,5 +1,133 @@
 (defconstant +blocking-factor+ 1)
 
+(defun gen-simple-fft/medium (size
+                              &key (dst 'dst)
+                                (src 'src)
+                                (tmp 'tmp)
+                                (startd 'startd)
+                                (starts 'starts)
+                                (startt 'startt)
+                                (strides 1)
+                                (strided 1)
+                                (twiddle 'twiddle)
+                                (cooley-tukey 'cooley-tukey))
+  (assert (evenp (integer-length (1- size))))
+  (assert (= 1 strided))
+  (let ((half-size (ash 1 (truncate (integer-length (1- size))
+                                    2))))
+    `(flet ((sub-fft (dst src twiddle
+                          startd starts)
+              (declare (type complex-sample-array dst src twiddle)
+                       (type index startd starts))
+              ,(gen-fft/small half-size)))
+       (loop for i of-type index below ,half-size
+             for j of-type index from 0 by ,half-size
+             do (loop for count of-type index from ,half-size above 0
+                      for j from ,startt
+                      for k of-type index from (+ i ,starts) by ,half-size
+                      do (setf (ref ,tmp j) (ref ,src (* k ,strides))))
+                (sub-fft ,dst ,tmp ,twiddle (+ j ,startd) ,startt)
+                (loop for i of-type index from (+ j ,startd)
+                      for idx of-type index from j
+                      for count below ,half-size
+                      do (setf (ref ,dst i)
+                               (* (ref ,dst i)
+                                  (ref ,cooley-tukey idx)))))
+       (loop for i of-type index below ,half-size do
+         (loop for count from ,half-size above 0
+               for j of-type index from ,startt
+               for k of-type index from (+ i ,startd) by ,half-size
+               do (setf (ref ,tmp j) (ref ,dst k)))
+         (sub-fft ,tmp ,tmp ,twiddle
+                  (+ ,startt ,half-size) ,startt)
+         (loop for count from ,half-size above 0
+               for j of-type index from (+ ,startt ,half-size)
+               for k of-type index from (+ i ,startd) by ,half-size
+               do (setf (ref ,dst k) (ref ,tmp j))))
+       dst)))
+
+(defun gen-generic-fft/medium (size
+                               &key (dst 'dst)
+                                 (src 'src)
+                                 (tmp 'tmp)
+                                 (startd 'startd)
+                                 (starts 'starts)
+                                 (startt 'startt)
+                                 (strides 1)
+                                 (strided 1)
+                                 (twiddle 'twiddle)
+                                 (cooley-tukey 'cooley-tukey))
+  (let* ((size1 (ash 1 (truncate (integer-length (1- size))
+                                 2)))
+         (size2 (/ size size1)))
+    (assert (integerp size2))
+    `(progn
+       (loop for i of-type index below ,size1
+             for j of-type index from 0 by ,size2
+             do (loop for count of-type index from ,size2 above 0
+                      for j from ,startt
+                      for k of-type index from (+ i ,starts) by ,size1
+                      do (setf (ref ,tmp j) (ref ,src (* k ,strides))))
+                (let ((startd (+ j ,startd)))
+                  ,(gen-fft/small size2
+                                  :dst dst :src tmp :twiddle twiddle
+                                  :startd 'startd
+                                  :starts startt
+                                  :strided strided))
+                (loop for i of-type index from (+ j ,startd) by ,strided
+                      for idx of-type index from j
+                      for count below ,size2
+                      do (setf (ref ,dst i)
+                               (* (ref ,dst i)
+                                  (ref ,cooley-tukey idx)))))
+       (loop for i of-type index below ,size2 do
+         (loop for count from ,size1 above 0
+               for j of-type index from ,startt
+               for k of-type index from (+ i ,startd) by (* ,size2 ,strided)
+               do (setf (ref ,tmp j) (ref ,dst k)))
+         (let ((startd (+ ,startt ,size1)))
+           ,(gen-fft/small size1
+                           :dst tmp :src tmp :twiddle twiddle
+                           :startd 'startd
+                           :starts startt))
+         (loop for count from ,size1 above 0
+               for j of-type index from (+ ,startt ,size1)
+               for k of-type index from (+ i ,startd) by (* ,size2 ,strided)
+               do (setf (ref ,dst k) (ref ,tmp j))))
+       dst)))
+
+(defun gen-fft/medium (size &rest args
+                       &key (dst 'dst)
+                         (src 'src)
+                         (tmp 'tmp)
+                         (startd 'startd)
+                         (starts 'starts)
+                         (startt 'startt)
+                         (strides 1)
+                         (strided 1)
+                         (twiddle 'twiddle)
+                         (cooley-tukey 'cooley-tukey))
+  (declare (ignore dst src tmp
+                   startd starts startt
+                   strides
+                   twiddle cooley-tukey))
+  (if (and (evenp (integer-length (1- size)))
+           (eql strided 1))
+      (apply 'gen-square-fft/medium size args)
+      (apply 'gen-generic-fft/medium size args)))
+
+#+nil
+(let ((fun (compile nil `(lambda (dst src twiddle startd starts)
+                           ,(gen-fft/small 16))))
+      (twiddle (bordeaux-fft::make-twiddle-factors 16 1))
+      (ck-factors (bordeaux-fft::make-cooley-tuckey-factors 16 16 1))
+      (src *vec*)
+      (dst (make-array 256 :element-type 'complex-sample))
+      (tmp (make-array 256 :element-type 'complex-sample)))
+  (medium-fft fun twiddle 256
+              src dst tmp ck-factors))
+
+#+nil
 (defun medium-fft (small-fft twiddle size
                    vec dst tmp ck-factors)
   (declare (type function small-fft)
@@ -35,12 +163,3 @@
             do (setf (ref dst k) (ref tmp j))))
     dst))
 
-(let ((fun (compile nil `(lambda (dst src twiddle startd starts)
-                           ,(gen-fft/n 16))))
-      (twiddle (bordeaux-fft::make-twiddle-factors 16 1))
-      (ck-factors (bordeaux-fft::make-cooley-tuckey-factors 16 16 1))
-      (src *vec*)
-      (dst (make-array 256 :element-type 'complex-sample))
-      (tmp (make-array 256 :element-type 'complex-sample)))
-  (medium-fft fun twiddle 256
-              src dst tmp ck-factors))
