@@ -122,36 +122,44 @@
   (declare (type complex-sample-array vec tmp)
            (type half-size size1 size2)
            (type size total)
-           (type index vecs tmps))
+           (type index vecs tmps)
+           (optimize speed (safety 0)))
   (flet ((%transpose-into (dst src size startd starts strided strides)
-           (%transpose-into dst src size startd starts strided strides)))
+           (%transpose-into dst src size startd starts strided strides)
+           dst)
+         (blit (dst startd src starts count)
+           (declare (type complex-sample-array dst src)
+                    (type index startd starts count)
+                    (optimize speed (safety 0)))
+           (loop for count of-type index from count above 0 by 4
+                 for dsti of-type index from startd by 4
+                 for srci of-type index from starts by 4
+                 do (setf (ref dst (+ dsti 0)) (ref src (+ srci 0))
+                          (ref dst (+ dsti 1)) (ref src (+ srci 1))
+                          (ref dst (+ dsti 2)) (ref src (+ srci 2))
+                          (ref dst (+ dsti 3)) (ref src (+ srci 3))))
+           dst))
     (cond ((= size1 size2)
            (return-from transpose (%transpose! vec size1 vecs size1)))
           ((< size1 size2)
            (let* ((size  size1)
-                  (block (* size size)))
+                  (block (truncate total 2)))
              (%transpose-into tmp vec size
                               0   0
                               size2 size1)
              (%transpose-into tmp vec size
                               size1 block
-                              size2 size1)))
+                              size2 size1))
+           (blit vec vecs tmp tmps total))
           (t
            (let* ((size  size2)
-                  (block (* size size)))
+                  (block (truncate total 2)))
              (%transpose-into tmp vec size
                               0   0
                               size2 size1)
              (%transpose-into tmp vec size
                               block size2
-                              size2 size1)))))
-  (loop for count from total above 0 by 4
-        for vecs from vecs by 4
-        for tmps from tmps by 4
-        do (setf (ref vec (+ vecs 0)) (ref tmp (+ tmps 0))
-                 (ref vec (+ vecs 1)) (ref tmp (+ tmps 1))
-                 (ref vec (+ vecs 2)) (ref tmp (+ tmps 2))
-                 (ref vec (+ vecs 3)) (ref tmp (+ tmps 3))))
-  vec)
+                              size2 size1))
+           (blit vec vecs tmp tmps total)))))
 
 (declaim (notinline %transpose! %transpose-into))
