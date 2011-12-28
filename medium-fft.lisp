@@ -29,7 +29,7 @@
                                    for block below +blocking-factor+
                                    append
                                    `((ref ,tmp (+ j ,(* block half-size)))
-                                     (ref ,src (+ (* (+ k ,block) ,strides)))))))
+                                     (ref ,src (* (+ k ,block) ,strides))))))
              do (progn
                   ,@(loop
                       for block below +blocking-factor+
@@ -64,8 +64,9 @@
                  for k of-type index from (+ i ,startd) by ,half-size
                  do (setf ,@(loop
                               for block below +blocking-factor+
-                              append `((ref ,dst (+ k ,block)) (ref ,tmp
-                                                                    (+ j ,(* block half-size)))))))))
+                              append `((ref ,dst (+ k ,block))
+                                       (ref ,tmp
+                                            (+ j ,(* block half-size)))))))))
        dst)))
 
 (defun gen-generic-fft/medium (size
@@ -84,38 +85,59 @@
          (size2 (/ size size1)))
     (assert (integerp size2))
     `(progn
-       (loop for i of-type index below ,size1
-             for j of-type index from 0 by ,size2
-             do (loop for count of-type index from ,size2 above 0
-                      for j from ,startt
-                      for k of-type index from (+ i ,starts) by ,size1
-                      do (setf (ref ,tmp j) (ref ,src (* k ,strides))))
-                (let ((startd (+ j ,startd)))
-                  ,(gen-fft/small size2
-                                  :dst dst :src tmp :twiddle twiddle
-                                  :startd 'startd
-                                  :starts startt
-                                  :strided strided))
-                (loop for i of-type index from (+ j ,startd) by ,strided
-                      for idx of-type index from j
-                      for count below ,size2
-                      do (setf (ref ,dst i)
-                               (* (ref ,dst i)
-                                  (ref ,cooley-tukey idx)))))
-       (loop for i of-type index below ,size2 do
-         (loop for count from ,size1 above 0
-               for j of-type index from ,startt
-               for k of-type index from (+ i ,startd) by (* ,size2 ,strided)
-               do (setf (ref ,tmp j) (ref ,dst k)))
-         (let ((startd (+ ,startt ,size1)))
-           ,(gen-fft/small size1
-                           :dst tmp :src tmp :twiddle twiddle
-                           :startd 'startd
-                           :starts startt))
-         (loop for count from ,size1 above 0
-               for j of-type index from (+ ,startt ,size1)
-               for k of-type index from (+ i ,startd) by (* ,size2 ,strided)
-               do (setf (ref ,dst k) (ref ,tmp j))))
+       (flet ((rec (startd starts)
+                ,(gen-fft/small size2
+                                :dst dst :src tmp :twiddle twiddle
+                                :startd 'startd
+                                :starts 'starts
+                                :strided strided)))
+         (loop for i of-type index below ,size1 by +blocking-factor+
+               for j of-type index from 0 by ,(* +blocking-factor+ size2)
+               do (loop for count of-type index from ,size2 above 0
+                        for j from ,startt
+                        for k of-type index from (+ i ,starts) by ,size1
+                        do (setf ,@(loop
+                                     for block below +blocking-factor+
+                                     append `((ref ,tmp (+ j ,(* block size2)))
+                                              (ref ,src (* (+ k ,block) ,strides))))))
+               do (progn
+                    ,@(loop
+                        for block below +blocking-factor+
+                        collect `(rec (+ j ,(* block size2) ,startd)
+                                      (+ ,startt ,(* block size2))))
+                    (loop for i of-type index from (+ j ,startd) by ,strided
+                          for idx of-type index from j
+                          for count below ,(* size2 +blocking-factor+)
+                          do (setf (ref ,dst i)
+                                   (* (ref ,dst i)
+                                      (ref ,cooley-tukey idx)))))))
+       (flet ((rec (startd starts)
+                ,(gen-fft/small size1
+                                :dst tmp :src tmp :twiddle twiddle
+                                :startd 'startd
+                                :starts 'starts)))
+         (loop for i of-type index below ,size2 by +blocking-factor+ do
+           (loop for count from ,size1 above 0
+                 for j of-type index from ,startt
+                 for k of-type index from (+ i ,startd) by (* ,size2 ,strided)
+                 do (setf ,@(loop
+                              for block below +blocking-factor+
+                              append `((ref ,tmp (+ j ,(* block size1)))
+                                       (ref ,dst (+ k ,block))))))
+           do (progn
+                ,@(loop
+                    for block below +blocking-factor+
+                    collect `(rec (+ ,startt ,(* +blocking-factor+ size1)
+                                     ,(* block size1))
+                                  (+ ,startt ,(* block size1))))
+                (loop for count from ,size1 above 0
+                      for j of-type index
+                        from (+ ,startt ,(* +blocking-factor+ size1))
+                      for k of-type index from (+ i ,startd) by (* ,size2 ,strided)
+                      do (setf
+                          ,@(loop for block below +blocking-factor+
+                                  append `((ref ,dst (+ k ,block))
+                                           (ref ,tmp (+ j ,(* block size1))))))))))
        dst)))
 
 (defun gen-fft/medium (size &rest args
