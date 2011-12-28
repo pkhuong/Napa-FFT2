@@ -362,7 +362,7 @@
   (and (numberp x)
        (= 1 x)))
 
-(defun generate-transpose (size1 size2
+(defun generate-transpose (size1 size2 copy
                            &rest args
                            &key
                              (vec 'vec)
@@ -375,7 +375,10 @@
                              (scale   1d0)
                            &aux (total (* size1 size2)))
   (if (= size1 size2)
-      (apply 'generate-square-transpose size1 args)
+      (apply (if copy
+                 'generate-transpose-copy
+                 'generate-square-transpose)
+             size1 args)
       (let ((size  (min size1 size2))
             (block (truncate total 2)))
         `(flet ((rec (dst src startd starts)
@@ -412,6 +415,8 @@
                 `(progn
                    (rec ,tmp ,vec ,tmps ,vecs)
                    (rec ,tmp ,vec (+ ,tmp ,block) (+ ,vecs ,size2))))
-           (copy ,vec ,tmp ,vecs ,tmps
-                 ,@(and twiddle `(,twiddle ,twiddle-start))
-                 ,@(and (not (onep scale)) `(,scale)))))))
+           ,(if copy
+                tmp
+                `(copy ,vec ,tmp ,vecs ,tmps
+                       ,@(and twiddle `(,twiddle ,twiddle-start))
+                       ,@(and (not (onep scale)) `(,scale))))))))
