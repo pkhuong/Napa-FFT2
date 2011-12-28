@@ -24,7 +24,7 @@
        (loop for i of-type index below ,half-size by ,+blocking-factor+
              for j of-type index from 0 by ,(* +blocking-factor+ half-size)
              do (loop for count of-type index from ,half-size above 0
-                      for j from ,startt
+                      for j of-type index from ,startt
                       for k of-type index from (+ (* ,strides i) ,starts)
                         by (* ,strides ,half-size)
                       do (setf ,@(loop
@@ -47,8 +47,8 @@
                         do (setf (ref ,dst i)
                                  (* (ref ,dst i)
                                     (ref ,cooley-tukey idx))))))
-       (loop for i of-type index below ,half-size by +blocking-factor+ do
-         (loop for count from ,half-size above 0
+       (loop for i of-type half-index below ,half-size by +blocking-factor+ do
+         (loop for count of-type half-index from ,half-size above 0
                for j of-type index from ,startt
                for k of-type index from (+ i ,startd) by ,half-size
                do (setf ,@(loop
@@ -63,7 +63,7 @@
                              (+ ,startt ,(* +blocking-factor+ half-size)
                                         ,(* block half-size))
                              (+ ,startt ,(* block half-size))))
-           (loop for count from ,half-size above 0
+           (loop for count of-type half-index from ,half-size above 0
                  for j of-type index from (+ ,startt ,(* +blocking-factor+ half-size))
                  for k of-type index from (+ i ,startd) by ,half-size
                  do (setf ,@(loop
@@ -89,9 +89,9 @@
          (size2 (/ size size1)))
     (assert (integerp size2))
     `(progn
-       (flet ((rec (dst src startd starts)
+       (flet ((rec (dst src startd starts twiddle)
                 ,(gen-fft/small size2
-                                :dst 'dst :src 'src :twiddle twiddle
+                                :dst 'dst :src 'src :twiddle 'twiddle
                                 :startd 'startd
                                 :starts 'starts
                                 :strided strided)))
@@ -99,7 +99,7 @@
          (loop for i of-type index below ,size1 by +blocking-factor+
                for j of-type index from 0 by ,(* +blocking-factor+ size2)
                do (loop for count of-type index from ,size2 above 0
-                        for j from ,startt
+                        for j of-type index from ,startt
                         for k of-type index from (+ (* i ,strides) ,starts)
                           by (* ,size1 ,strides)
                         do (setf ,@(loop
@@ -112,20 +112,21 @@
                         collect `(rec ,dst ,tmp
                                       (+ (* ,strided (+ j ,(* block size2)))
                                          ,startd)
-                                      (+ ,startt ,(* block size2))))
+                                      (+ ,startt ,(* block size2))
+                                      ,twiddle))
                     (loop for i of-type index from (+ (* j ,strided) ,startd) by ,strided
                           for idx of-type index from j
-                          for count below ,(* size2 +blocking-factor+)
+                          for count of-type index below ,(* size2 +blocking-factor+)
                           do (setf (ref ,dst i)
                                    (* (ref ,dst i)
                                       (ref ,cooley-tukey idx)))))))
-       (flet ((rec (vec startd starts)
+       (flet ((rec (vec startd starts twiddle)
                 ,(gen-fft/small size1
-                                :dst 'vec :src 'vec :twiddle twiddle
+                                :dst 'vec :src 'vec :twiddle 'twiddle
                                 :startd 'startd
                                 :starts 'starts)))
          (loop for i of-type index below ,size2 by +blocking-factor+ do
-           (loop for count from ,size1 above 0
+           (loop for count of-type half-index from ,size1 above 0
                  for j of-type index from ,startt
                  for k of-type index from (+ (* i ,strided) ,startd)
                    by (* ,size2 ,strided)
@@ -140,7 +141,7 @@
                                   (+ ,startt ,(* +blocking-factor+ size1)
                                      ,(* block size1))
                                   (+ ,startt ,(* block size1))))
-                (loop for count from ,size1 above 0
+                (loop for count of-type half-index from ,size1 above 0
                       for j of-type index
                         from (+ ,startt ,(* +blocking-factor+ size1))
                       for k of-type index from (+ (* i ,strided) ,startd)
@@ -169,53 +170,6 @@
                    twiddle cooley-tukey))
   (if (and (evenp (integer-length (1- size)))
            (eql strided 1))
-      (apply 'gen-square-fft/medium size args)
+      (apply 'gen-simple-fft/medium size args)
       (apply 'gen-generic-fft/medium size args)))
-
-#+nil
-(let ((fun (compile nil `(lambda (dst src twiddle startd starts)
-                           ,(gen-fft/small 16))))
-      (twiddle (bordeaux-fft::make-twiddle-factors 16 1))
-      (ck-factors (bordeaux-fft::make-cooley-tuckey-factors 16 16 1))
-      (src *vec*)
-      (dst (make-array 256 :element-type 'complex-sample))
-      (tmp (make-array 256 :element-type 'complex-sample)))
-  (medium-fft fun twiddle 256
-              src dst tmp ck-factors))
-
-#+nil
-(defun medium-fft (small-fft twiddle size
-                   vec dst tmp ck-factors)
-  (declare (type function small-fft)
-           (type size size)
-           (type complex-sample-array vec dst tmp
-                 twiddle ck-factors)
-           (optimize speed (safety 0)))
-  (let ((half-size (ash 1 (truncate (integer-length (1- size))
-                                    2))))
-    (loop for i of-type index below half-size
-          for dsts of-type index by half-size
-          do (loop for j of-type index below half-size
-                   for k of-type index from i by half-size
-                   do (setf (ref tmp j) (ref vec k)))
-             (funcall small-fft
-                      dst  tmp twiddle
-                      dsts 0)
-             (loop for i from dsts
-                   for count from half-size above 0
-                   do (setf (ref dst i)
-                            (* (ref dst i)
-                               (ref ck-factors i)))))
-    (loop for i of-type index below half-size do
-      (loop for j of-type index below half-size
-            for k of-type index from i by half-size
-            do (setf (ref tmp j) (ref dst k)))
-      (funcall small-fft
-               tmp tmp twiddle
-               half-size 0)
-      (loop for j of-type index from half-size
-            for k of-type index from i by half-size
-            below size
-            do (setf (ref dst k) (ref tmp j))))
-    dst))
 
