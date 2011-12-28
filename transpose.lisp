@@ -1,10 +1,10 @@
 ;; large in-place transpose (with a scratch buffer for non-square
 ;; matrices)
-;;
-;; For now, implement it always as a copying transpose.
 
 
 (defconstant +transpose-base-size+ (ash 1 5))
+
+(declaim (inline %transpose! %transpose-into))
 
 (defun %transpose! (vec size start stride)
   (declare (type complex-sample-array vec)
@@ -123,26 +123,28 @@
            (type half-size size1 size2)
            (type size total)
            (type index vecs tmps))
-  (cond ((= size1 size2)
-         (return-from transpose (%transpose! vec size1 vecs size1)))
-        ((< size1 size2)
-         (let* ((size  size1)
-                (block (* size size)))
-           (%transpose-into tmp vec size
-                            0   0
-                            size2 size1)
-           (%transpose-into tmp vec size
-                            size1 block
-                            size2 size1)))
-        (t
-         (let* ((size  size2)
-                (block (* size size)))
-           (%transpose-into tmp vec size
-                            0   0
-                            size2 size1)
-           (%transpose-into tmp vec size
-                            block size2
-                            size2 size1))))
+  (flet ((%transpose-into (dst src size startd starts strided strides)
+           (%transpose-into dst src size startd starts strided strides)))
+    (cond ((= size1 size2)
+           (return-from transpose (%transpose! vec size1 vecs size1)))
+          ((< size1 size2)
+           (let* ((size  size1)
+                  (block (* size size)))
+             (%transpose-into tmp vec size
+                              0   0
+                              size2 size1)
+             (%transpose-into tmp vec size
+                              size1 block
+                              size2 size1)))
+          (t
+           (let* ((size  size2)
+                  (block (* size size)))
+             (%transpose-into tmp vec size
+                              0   0
+                              size2 size1)
+             (%transpose-into tmp vec size
+                              block size2
+                              size2 size1)))))
   (loop for count from total above 0 by 4
         for vecs from vecs by 4
         for tmps from tmps by 4
@@ -152,3 +154,4 @@
                  (ref vec (+ vecs 3)) (ref tmp (+ tmps 3))))
   vec)
 
+(declaim (notinline %transpose! %transpose-into))
