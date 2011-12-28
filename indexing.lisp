@@ -85,9 +85,7 @@
 
 (defun simplify-indexing-expression (index env)
   (when (typep index `(or atom
-                          (not (cons (member + *)))
-                          (cons t (cons atom (or null
-                                                 (cons atom null))))))
+                          (not (cons (member + *)))))
     (return-from simplify-indexing-expression index))
   (let ((terms  (make-hash-table :test #'equal)) ; multiplier -> operands
         (noise '())
