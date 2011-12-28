@@ -72,16 +72,31 @@
   (* x y))
 
 (define-compiler-macro scale (x y &environment env)
-  (if (or (= y 1)
+  (if (or (and (numberp y)
+               (= y 1))
           #+sbcl
           (and (constantp x env)
-               (= 1 (sb-int:constant-form-value x env))))
+               (let ((x (sb-int:constant-form-value x env)))
+                 (and (numberp x)
+                      (= 1 x)))))
       `(the complex-sample ,x)
       `((lambda (x y)
           (declare (type complex-sample x)
                    (type double-float y))
           (* x y))
         ,x ,y)))
+
+(defmacro %twiddle (x twiddle index)
+  (if twiddle
+      `(* ,x (ref ,twiddle ,index))
+      x))
+
+(defmacro swapf (x y)
+  `(let ((x ,x)
+         (y ,y))
+     (declare (type complex-sample-array x y))
+     (setf ,x y
+           ,y x)))
 
 (defun make-cooley-tukey-factors (size1 size2 direction
                                   &optional (coeffs (make-array
