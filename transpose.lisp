@@ -118,9 +118,10 @@
                            (+ starts long-strides size/2)))))))
     (rec size startd starts)))
 
-(defun transpose (vec tmp size1 size2 vecs tmps)
+(defun transpose (vec tmp size1 size2 total vecs tmps)
   (declare (type complex-sample-array vec tmp)
            (type half-size size1 size2)
+           (type size total)
            (type index vecs tmps))
   (cond ((= size1 size2)
          (return-from transpose (%transpose! vec size1 vecs size1)))
@@ -142,7 +143,7 @@
            (%transpose-into tmp vec size
                             block size2
                             size2 size1))))
-  (loop for count from (* size1 size2) above 0 by 4
+  (loop for count from total above 0 by 4
         for vecs from vecs by 4
         for tmps from tmps by 4
         do (setf (ref vec (+ vecs 0)) (ref tmp (+ tmps 0))
@@ -150,3 +151,4 @@
                  (ref vec (+ vecs 2)) (ref tmp (+ tmps 2))
                  (ref vec (+ vecs 3)) (ref tmp (+ tmps 3))))
   vec)
+
