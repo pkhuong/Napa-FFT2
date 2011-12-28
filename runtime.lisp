@@ -65,11 +65,29 @@
      (assert default)
      `(* ,x ,default))))
 
+(declaim (inline scale))
+(defun scale (x y)
+  (declare (type complex-sample x)
+           (type double-float y))
+  (* x y))
+
+(define-compiler-macro scale (x y &environment env)
+  (if (or (= y 1)
+          #+sbcl
+          (and (constantp x env)
+               (= 1 (sb-int:constant-form-value x env))))
+      `(the complex-sample ,x)
+      `((lambda (x y)
+          (declare (type complex-sample x)
+                   (type double-float y))
+          (* x y))
+        ,x ,y)))
+
 (defun make-cooley-tukey-factors (size1 size2 direction
-                                   &optional (coeffs (make-array
-                                                      (* size1 size2)
-                                                      :element-type 'complex-sample))
-                                     (offset 0))
+                                  &optional (coeffs (make-array
+                                                     (* size1 size2)
+                                                     :element-type 'complex-sample))
+                                    (offset 0))
   (declare (type half-index size1 size2)
            (type (member -1 1) direction)
            (type complex-sample-array coeffs)
