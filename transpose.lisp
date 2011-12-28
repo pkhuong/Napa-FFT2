@@ -123,7 +123,7 @@
            (type half-size size1 size2)
            (type size total)
            (type index vecs tmps)
-           (optimize speed (safety 0)))
+           (optimize speed))
   (flet ((%transpose-into (dst src size startd starts strided strides)
            (%transpose-into dst src size startd starts strided strides)
            dst)
