@@ -9,6 +9,7 @@
                                 (startt 'startt)
                                 (strides 1)
                                 (strided 1)
+                                (scale 1d0)
                                 (twiddle 'twiddle)
                                 (cooley-tukey 'cooley-tukey)
                                 (blocking-factor +default-blocking-factor+))
@@ -33,7 +34,8 @@
                                    for block below blocking-factor
                                    append
                                    `((ref ,tmp (+ j ,(* block half-size)))
-                                     (ref ,src (+ k (* ,block ,strides)))))))
+                                     (scale (ref ,src (+ k (* ,block ,strides)))
+                                            ,scale)))))
              do (progn
                   ;; FFT columns in scratch space
                   ;; write result to dst, in rows
@@ -84,6 +86,7 @@
                                  (startt 'startt)
                                  (strides 1)
                                  (strided 1)
+                                 (scale 1d0)
                                  (twiddle 'twiddle)
                                  (cooley-tukey 'cooley-tukey)
                                  (blocking-factor +default-blocking-factor+))
@@ -110,7 +113,8 @@
                         do (setf ,@(loop
                                      for block below blocking-factor
                                      append `((ref ,tmp (+ j ,(* block size2)))
-                                              (ref ,src (+ k (* ,block ,strides)))))))
+                                              (scale (ref ,src (+ k (* ,block ,strides)))
+                                                     ,scale)))))
                do (progn
                     ,@(loop
                         for block below blocking-factor
@@ -170,12 +174,14 @@
                          (startt 'startt)
                          (strides 1)
                          (strided 1)
+                         (scale  1d0)
                          (twiddle 'twiddle)
                          (cooley-tukey 'cooley-tukey)
                          (blocking-factor +default-blocking-factor+))
   (declare (ignore dst src tmp
                    startd starts startt
                    strides
+                   scale
                    twiddle cooley-tukey
                    blocking-factor))
   (if (and (evenp (integer-length (1- size)))
