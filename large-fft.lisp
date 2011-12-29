@@ -7,12 +7,9 @@
                                (startt 'startt)
                                (scale  1d0)
                                (twiddle 'twiddle)
-                               (cooley-tukey-large 'cooley-tukey-large)
-                               (cooley-tukey-size1 'cooley-tukey-size1)
-                               (cooley-tukey-size2 'cooley-tukey-size2)
+                               (cooley-tukey 'cooley-tukey)
                                &aux (scalep (not (onep scale)))
                                  (size (* half-size half-size)))
-  (declare (ignore cooley-tukey-size2))
   `(flet ((rec (dst src tmp startd starts startt
                 twiddle ck)
             (declare (type complex-sample-array dst src tmp)
@@ -32,12 +29,12 @@
                    (+ ,starts i)
                    ,startt
                    ,twiddle
-                   ,cooley-tukey-size1))
+                   ,cooley-tukey))
      ,(generate-transpose half-size half-size nil
                           :vec dst :tmp tmp
                           :vecs startd :tmps startt
-                          :twiddle cooley-tukey-large
-                          :twiddle-start 0)
+                          :twiddle cooley-tukey
+                          :twiddle-start (+ size +factor-bias+))
      (loop for i of-type index below ,size by ,half-size
            do (let ((start-dst (+ ,startd i))
                     (start-tmp (+ ,startt ,half-size))
@@ -50,7 +47,7 @@
                      start-dst
                      start-tmp
                      ,twiddle
-                     ,cooley-tukey-size1)
+                     ,cooley-tukey)
                 ,(generate-blit half-size
                                 :dst dst :src tmp
                                 :startd 'start-dst :starts startt
@@ -65,9 +62,7 @@
                                (startt 'startt)
                                (scale  1d0)
                                (twiddle 'twiddle)
-                               (cooley-tukey-large 'cooley-tukey-large)
-                               (cooley-tukey-size1 'cooley-tukey-size1)
-                               (cooley-tukey-size2 'cooley-tukey-size2)
+                               (cooley-tukey 'cooley-tukey)
                                &aux (scalep (not (constantp scale)))
                                  (size (* size1 size2)))
   `(progn
@@ -90,12 +85,12 @@
                      (+ ,starts i)
                      ,startt
                      ,twiddle
-                     ,cooley-tukey-size1)))
+                     ,cooley-tukey)))
      ,(generate-transpose size1 size2 nil
                           :vec dst :tmp tmp
                           :vecs startd :tmps startt
-                          :twiddle cooley-tukey-large
-                          :twiddle-start 0)
+                          :twiddle cooley-tukey
+                          :twiddle-start (+ size +factor-bias+))
      (flet ((rec (dst src startd starts startt
                       twiddle ck)
               (declare (type complex-sample-array dst src tmp)
@@ -118,7 +113,7 @@
                        start-dst
                        start-tmp
                        ,twiddle
-                       ,cooley-tukey-size2)
+                       ,cooley-tukey)
                   (let ,(and scalep '((scale2 0d0)))
                     ,@(and scalep `((declare (type double-float scale2))
                                     (setf scale2 ,scale)))
@@ -136,13 +131,10 @@
                         (startt 'startt)
                         (scale  1d0)
                         (twiddle 'twiddle)
-                        (cooley-tukey-large 'cooley-tukey-large)
-                        (cooley-tukey-size1 'cooley-tukey-size1)
-                        (cooley-tukey-size2 'cooley-tukey-size2))
+                        (cooley-tukey 'cooley-tukey))
   (declare (ignore dst src tmp startd starts startt
                    scale twiddle
-                   cooley-tukey-large cooley-tukey-size1
-                   cooley-tukey-size2))
+                   cooley-tukey))
   (let* ((size1 (ash 1 (truncate (integer-length (1- size))
                                  2)))
          (size2 (/ size size1)))
@@ -161,34 +153,29 @@
                                  2)))
          (size2 (/ size size1))
          (twiddle (bordeaux-fft::make-twiddle-factors size2 1))
-         (ck      (make-cooley-tukey-factors size1 size2 1))
-         (ck1     (multiple-value-call #'make-cooley-tukey-factors
-                    (split-int size1) 1))
-         (ck2     (multiple-value-call #'make-cooley-tukey-factors
-                    (split-int size2) 1))
+         (ck      (make-all-factors (integer-length (1- size)) 1))
          (tmp     (make-array size :element-type 'complex-sample))
          (dst     (make-array size :element-type 'complex-sample)))
     (let ((transpose (compile nil `(lambda (vec tmp)
                                      (declare (type complex-sample-array vec tmp)
-                                              (optimize speed (safety 0)))
+                                              (optimize speed (safety 1)))
                                      ,(generate-transpose size2 size1 nil
                                                           :vecs 0 :tmps 0))))
           (fft       (compile nil `(lambda (src dst tmp
-                                            twiddle ck ck1 ck2)
+                                            twiddle ck)
                                      (declare (type complex-sample-array src tmp dst
-                                                    twiddle ck ck1 ck2)
-                                              (optimize speed (safety 0))
-                                              (ignorable twiddle ck1 ck2))
-                                     ,(gen-fft/large size :startd 0 :starts 0 :startt 0
-                                                          :twiddle 'twiddle
-                                                          :cooley-tukey-large 'ck
-                                                          :cooley-tukey-size1 'ck1
-                                                          :cooley-tukey-size2 'ck2)))))
+                                                    twiddle ck)
+                                              (optimize speed (safety 1))
+                                              (ignorable twiddle))
+                                     ,(gen-fft/large size
+                                                     :startd 0 :starts 0 :startt 0
+                                                     :twiddle 'twiddle
+                                                     :cooley-tukey 'ck)))))
       (time
        (progn
          (funcall transpose input tmp)
          (funcall fft input dst tmp
-                  twiddle ck ck1 ck2 .5d0)
+                  twiddle ck)
          (funcall transpose dst tmp)))
       dst)))
 
