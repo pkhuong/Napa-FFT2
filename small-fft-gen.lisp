@@ -116,6 +116,91 @@
                (@dst 7) (- a b)))
        ,dst)))
 
+(defun bit-reverse-values (bitwidth values)
+  (flet ((rev (x)
+           (let ((acc 0))
+             (loop repeat bitwidth
+                   for bit = (logand x 1)
+                   do (setf x (ash x -1))
+                      (setf acc (logior (ash acc 1) bit))
+                   finally (return acc)))))
+    (map '(simple-array index 1) #'rev values)))
+
+;; doesn't work very well (:
+(defun gen-unrolled-fft/small (size &key (dst 'dst)
+                                         (src 'src)
+                                      (startd 'startd)
+                                      (strided 1)
+                                      (starts 'starts)
+                                      (strides 1)
+                                      (twiddle 'twiddle)
+                                      (scale   1d0))
+  (assert (> size 8))
+  (let* ((leaf-size  8)
+         (base-cases (loop for i below size by leaf-size
+                           collect i))
+         (reversed   (bit-reverse-values (integer-length (1- size))
+                                         base-cases)))
+    `(flet ((rec (dst src startd starts)
+              ,(gen-fft/8 :dst 'dst :src 'src
+                          :startd 'startd :strided strided
+                          :starts 'starts
+                          :strides (* strides (the integer (/ size leaf-size)))
+                          :scale scale)))
+       (declare (notinline rec))
+       (loop for i of-type index from ,startd by (* ,leaf-size ,strided)
+             for reversed across ,reversed
+             do (rec ,dst ,src i (+ ,starts (* reversed ,strides))))
+       ,@(loop for current = (* 2 leaf-size) then (* 2 current)
+               for size/2 = (truncate current 2)
+               while (<= current size)
+               for forms = (if (<= current 16)
+                               `(,@(loop for idx below size/2
+                                         for i from size/2
+                                         for root = (/ (- idx) current)
+                                         for place = `(ref ,dst (+ startd (* ,i ,strided)))
+                                         unless (zerop idx)
+                                           collect
+                                         `(setf ,place
+                                                ,(mul-root place root `(ref ,twiddle ,i))))
+                                 ,@(loop repeat size/2
+                                         for i from 0
+                                         for j from size/2
+                                         collect `(let ((a (ref ,dst (+ startd (* ,i ,strided))))
+                                                        (b (ref ,dst (+ startd (* ,j ,strided)))))
+                                                    (setf (ref ,dst (+ startd (* ,i ,strided))) (+ a b)
+                                                          (ref ,dst (+ startd (* ,j ,strided))) (- a b)))))
+                               `((loop for .src. of-type index from (+ startd ,size/2) by 2
+                                       for .c. of-type index from ,size/2 below ,current by 2
+                                       do (let ((i0 (ref ,dst .src.))
+                                                (i1 (ref ,dst (+ 1 .src.)))
+                                                (c0 (ref ,twiddle .c.))
+                                                (c1 (ref ,twiddle (+ 1 .c.))))
+                                            (setf (ref ,dst       .src.) (* i0 c0)
+                                                  (ref ,dst (+ 1 .src.)) (* i1 c1))))
+                                 (loop for i of-type index from startd by 2
+                                       for j of-type index from (+ startd ,size/2) by 2
+                                       for .count. of-type index
+                                         from ,(truncate size/2 2) above 0
+                                       do (let ((a0 (ref ,dst i))
+                                                (b0 (ref ,dst j))
+                                                (a1 (ref ,dst (+ i 1)))
+                                                (b1 (ref ,dst (+ j 1))))
+                                            (setf (ref ,dst i)       (+ a0 b0)
+                                                  (ref ,dst j)       (- a0 b0)
+                                                  (ref ,dst (+ 1 i)) (+ a1 b1)
+                                                  (ref ,dst (+ 1 j)) (- a1 b1))))))
+               collect
+               (if (<= (/ size current) 4)
+                   `(progn
+                      ,@(loop for offset below size by current
+                              collect `(let ((startd (+ ,startd ,offset)))
+                                         ,@forms)))
+                   `(loop for startd from ,startd by ,current below ,size do
+                     (progn
+                       ,@forms))))
+       ,dst)))
+
 (defun gen-fft/small (size &rest args
                       &key (dst 'dst)
                         (src 'src)
@@ -170,8 +255,8 @@
                         for .c. of-type index from ,size/2 below ,size by 2
                         do (let ((i0 (ref ,dst .src.))
                                  (i1 (ref ,dst (+ 1 .src.)))
-                                 (c0 (ref twiddle .c.))
-                                 (c1 (ref twiddle (+ 1 .c.))))
+                                 (c0 (ref ,twiddle .c.))
+                                 (c1 (ref ,twiddle (+ 1 .c.))))
                              (setf (ref ,dst       .src.) (* i0 c0)
                                    (ref ,dst (+ 1 .src.)) (* i1 c1))))
                   (loop for i of-type index from ,startd by 2
