@@ -187,11 +187,11 @@
                          (type index start))
                 (cond ((<= size ,base-size)
                        (loop
-                         for i of-type half-index below size by 2
-                         for start1 of-type index from start by (* 2 ,size)
-                         for start2 of-type index from start by 2
+                         for i of-type half-index below size
+                         for start1 of-type index from start by ,size
+                         for start2 of-type index from start
                          ,@(and twiddle `(for idx of-type index from twiddle-start
-                                              by (* 2 ,size)))
+                                              by ,size))
                          do (loop for start1 of-type index from start1
                                   for start2 of-type index from start2 by ,size
                                   for j of-type half-index from i above 0
@@ -200,14 +200,13 @@
                                   do (progn
                                        ,(emit-swap `(ref ,vec start1)
                                                    `(ref ,vec start2)
-                                                   'idx)
-                                       ,(emit-swap `(ref ,vec (+ start1 ,size))
-                                                   `(ref ,vec (+ start2 1))
-                                                   `(+ idx ,size)))
-                                  finally ,(emit-swap
-                                            `(ref ,vec (+ start1 1))
-                                            `(ref ,vec (+ start2 ,size))
-                                            `(+ idx 1))))
+                                                   'idx)))
+                         ,@(and (or twiddle scale)
+                                `(do (setf (ref ,vec (+ start1 i))
+                                           (scale (%twiddle (ref ,vec (+ start1 i))
+                                                            ,twiddle ,(and twiddle
+                                                                           '(+ idx i)))
+                                                  ,scale)))))
                        ,vec)
                       (t
                        (let* ((size/2      (truncate size 2))
@@ -375,10 +374,14 @@
                              (scale   1d0)
                            &aux (total (* size1 size2)))
   (if (= size1 size2)
-      (apply (if copy
-                 'generate-transpose-copy
-                 'generate-square-transpose)
-             size1 args)
+      (if copy
+          (generate-transpose-copy size1 size1 size2
+                                   :dst tmp
+                                   :src vec
+                                   :startd tmps
+                                   :starts vecs
+                                   :base-size base-size)
+          (apply 'generate-square-transpose size1 args))
       (let ((size  (min size1 size2))
             (block (truncate total 2)))
         `(flet ((rec (dst src startd starts)
@@ -390,12 +393,12 @@
                                             :base-size base-size))
                 (copy (dst src startd starts
                            ,@(and twiddle '(twiddle twiddle-start))
-                           ,@(and (not (onep scale)) '(scale)))
+                           ,@(and (not (constantp scale)) '(scale)))
                   (declare (type complex-sample-array dst src
                                  ,@(and twiddle '(twiddle)))
                            (type index startd starts
                                  ,@(and twiddle '(twiddle-start)))
-                           ,@(and (not (onep scale))
+                           ,@(and (not (constantp scale))
                                   '((type double-float scale))))
                   ,(generate-blit total
                                   :dst 'dst
@@ -404,8 +407,9 @@
                                   :starts 'starts
                                   :twiddle (and twiddle 'twiddle)
                                   :twiddle-start (and twiddle 'twiddle-start)
-                                  :scale (and (not (onep scale))
-                                              'scale))
+                                  :scale (if (constantp scale)
+                                             scale
+                                             'scale))
                   dst))
            (declare (notinline copy))
            ,(if (< size1 size2)
@@ -414,9 +418,10 @@
                    (rec ,tmp ,vec (+ ,tmps ,size1) (+ ,vecs ,block)))
                 `(progn
                    (rec ,tmp ,vec ,tmps ,vecs)
-                   (rec ,tmp ,vec (+ ,tmp ,block) (+ ,vecs ,size2))))
+                   (rec ,tmp ,vec (+ ,tmps ,block) (+ ,vecs ,size2))))
            ,(if copy
                 tmp
                 `(copy ,vec ,tmp ,vecs ,tmps
                        ,@(and twiddle `(,twiddle ,twiddle-start))
-                       ,@(and (not (onep scale)) `(,scale))))))))
+                       ,@(and (not (constantp scale)) `(,scale))))))))
+
