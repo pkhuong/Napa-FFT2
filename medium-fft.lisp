@@ -47,7 +47,7 @@
                                 (+ j ,startd ,(* block half-size))
                                 (+ ,startt ,(* block half-size))))
                   (loop for i of-type index from (+ j ,startd)
-                        for idx of-type index from j
+                        for idx of-type index from (+ j ,(+ size +factor-bias+))
                         for count below ,(* half-size blocking-factor)
                         do (setf (ref ,dst i)
                                  (* (ref ,dst i)
@@ -128,7 +128,7 @@
                                       (+ ,startt ,(* block size2))
                                       ,twiddle))
                     (loop for i of-type index from (+ (* j ,strided) ,startd) by ,strided
-                          for idx of-type index from j
+                          for idx of-type index from (+ j ,(+ size +factor-bias+))
                           for count of-type index below ,(* size2 blocking-factor)
                           do (setf (ref ,dst i)
                                    (* (ref ,dst i)
@@ -201,18 +201,19 @@
 #||
 (compile nil `(lambda (dst src tmp twiddle ck)
                          (declare (type complex-sample-array dst src tmp twiddle ck)
-                                  (optimize speed (safety 0) (compilation-speed 0)))
+                                  (optimize speed (safety 1) (compilation-speed 0)))
                          ,(gen-fft/medium 4096
                                           :startd 0
                                           :starts 0
                                           :startt 0
-                                          :cooley-tukey 'ck)))
+                                          :cooley-tukey 'ck
+                                          :blocking-factor 1)))
 
 (let ((twiddle (bordeaux-fft::make-twiddle-factors 64 1))
-               (ck-factors (bordeaux-fft::make-cooley-tuckey-factors 64 64 1))
-               (src *vec*)
-               (dst (make-array 4096 :element-type 'complex-sample))
-               (tmp (make-array 4096 :element-type 'complex-sample)))
-           (dotimes (i 10 (prog1 nil (setf *y* dst)))
-             (time (funcall * dst src tmp twiddle ck-factors))))
+      (ck-factors (make-all-factors (integer-length (1- 4096)) 1))
+      (src *vec*)
+      (dst (make-array 4096 :element-type 'complex-sample))
+      (tmp (make-array 4096 :element-type 'complex-sample)))
+  (dotimes (i 10 (prog1 nil (setf *x* dst)))
+    (time (funcall * dst src tmp twiddle ck-factors))))
 ||#
