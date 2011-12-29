@@ -21,7 +21,8 @@
     `(flet ((sub-fft (dst src twiddle
                           startd starts)
               (declare (type complex-sample-array dst src twiddle)
-                       (type index startd starts))
+                       (type index startd starts)
+                       (ignorable twiddle))
               ,(gen-fft/small half-size)))
        ;; copy columns from src to tmp
        (loop for i of-type index below ,half-size by ,blocking-factor
@@ -51,7 +52,7 @@
                         do (setf (ref ,dst i)
                                  (* (ref ,dst i)
                                     (ref ,cooley-tukey idx))))))
-       (loop for i of-type half-index below ,half-size by blocking-factor do
+       (loop for i of-type half-index below ,half-size by ,blocking-factor do
          (loop for count of-type half-index from ,half-size above 0
                for j of-type index from ,startt
                for k of-type index from (+ i ,startd) by ,half-size
@@ -98,13 +99,16 @@
     (assert (<= blocking-factor size2))
     `(progn
        (flet ((rec (dst src startd starts twiddle)
+                (declare (type complex-sample-array dst src twiddle)
+                         (type index startd starts)
+                         (ignorable twiddle))
                 ,(gen-fft/small size2
                                 :dst 'dst :src 'src :twiddle 'twiddle
                                 :startd 'startd
                                 :starts 'starts
                                 :strided strided)))
          ;; copy columns to scratch
-         (loop for i of-type index below ,size1 by blocking-factor
+         (loop for i of-type index below ,size1 by ,blocking-factor
                for j of-type index from 0 by ,(* blocking-factor size2)
                do (loop for count of-type index from ,size2 above 0
                         for j of-type index from ,startt
@@ -130,11 +134,14 @@
                                    (* (ref ,dst i)
                                       (ref ,cooley-tukey idx)))))))
        (flet ((rec (vec startd starts twiddle)
+                (declare (type complex-sample-array dst src twiddle)
+                         (type index startd starts)
+                         (ignorable twiddle))
                 ,(gen-fft/small size1
                                 :dst 'vec :src 'vec :twiddle 'twiddle
                                 :startd 'startd
                                 :starts 'starts)))
-         (loop for i of-type index below ,size2 by blocking-factor do
+         (loop for i of-type index below ,size2 by ,blocking-factor do
            (loop for count of-type half-index from ,size1 above 0
                  for j of-type index from ,startt
                  for k of-type index from (+ (* i ,strided) ,startd)
@@ -150,7 +157,8 @@
                     collect `(rec ,tmp
                                   (+ ,startt ,(* blocking-factor size1)
                                      ,(* block size1))
-                                  (+ ,startt ,(* block size1))))
+                                  (+ ,startt ,(* block size1))
+                                  ,twiddle))
                 (loop for count of-type half-index from ,size1 above 0
                       for j of-type index
                         from (+ ,startt ,(* blocking-factor size1))
@@ -189,3 +197,22 @@
       (apply 'gen-simple-fft/medium size args)
       (apply 'gen-generic-fft/medium size args)))
 
+
+#||
+(compile nil `(lambda (dst src tmp twiddle ck)
+                         (declare (type complex-sample-array dst src tmp twiddle ck)
+                                  (optimize speed (safety 0) (compilation-speed 0)))
+                         ,(gen-fft/medium 4096
+                                          :startd 0
+                                          :starts 0
+                                          :startt 0
+                                          :cooley-tukey 'ck)))
+
+(let ((twiddle (bordeaux-fft::make-twiddle-factors 64 1))
+               (ck-factors (bordeaux-fft::make-cooley-tuckey-factors 64 64 1))
+               (src *vec*)
+               (dst (make-array 4096 :element-type 'complex-sample))
+               (tmp (make-array 4096 :element-type 'complex-sample)))
+           (dotimes (i 10 (prog1 nil (setf *y* dst)))
+             (time (funcall * dst src tmp twiddle ck-factors))))
+||#
