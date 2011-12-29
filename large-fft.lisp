@@ -96,14 +96,14 @@
                           :vecs startd :tmps startt
                           :twiddle cooley-tukey-large
                           :twiddle-start 0)
-     (flet ((rec (dst src tmp startd starts startt
+     (flet ((rec (dst src startd starts startt
                       twiddle ck)
               (declare (type complex-sample-array dst src tmp)
                        (type index startd starts startt)
                        (type complex-sample-array twiddle ck))
               ,(gen-fft/medium size2 :dst 'dst
                                      :src 'src
-                                     :tmp 'tmp
+                                     :tmp 'dst
                                      :startd 'startd
                                      :starts 'starts
                                      :startt 'startt
@@ -113,7 +113,7 @@
              do (let ((start-dst (+ ,startd i))
                       (start-tmp (+ ,startt ,size2)))
                   (declare (type index start-dst start-tmp))
-                  (rec ,tmp ,dst ,tmp
+                  (rec ,tmp ,dst
                        ,startt
                        start-dst
                        start-tmp
