@@ -227,7 +227,7 @@
                 (declare (type half-size size)
                          (type index start1 start2)
                          ,@(and twiddle '((type index twiddle-start))))
-                (cond ((<= size +transpose-base-size+)
+                (cond ((<= size ,base-size)
                        (loop
                          for i from size above 0 by 4
                          for start1 of-type index from start1 by (* 4 ,size)
@@ -270,7 +270,7 @@
                                ,@(and twiddle '((+ twiddle-start long-stride))))
                          (swap size/2
                                (+ start1 long-stride size/2)
-                               (+ start1 long-stride size/2)
+                               (+ start2 long-stride size/2)
                                ,@(and twiddle `((+ twiddle-start
                                                    long-stride size/2)))))))))
        (in-place ,size ,vecs
