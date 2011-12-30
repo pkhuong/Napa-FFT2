@@ -8,7 +8,7 @@
     (loop for i below len by block-size
           for j upfrom 0
           for last of-type index = (min len (+ i block-size))
-          do (multiple-value-bind (value count)
+          do (multiple-value-bind (value time)
                  (sb-vm::with-cycle-counter
                    (let (dst)
                      (loop for i from i below last
