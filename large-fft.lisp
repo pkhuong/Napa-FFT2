@@ -37,21 +37,21 @@
                           :twiddle-start (+ size +factor-bias+))
      (loop for i of-type index below ,size by ,half-size
            do (let ((start-dst (+ ,startd i))
-                    (start-tmp (+ ,startt ,half-size))
-                    ,@(and scalep '((.scale2.    0d0))))
-                (declare (type index start-dst start-tmp)
-                         ,@(and scalep '((type double-float scale2))))
-                ,(and scalep `(setf .scale2. ,scale))
+                    (start-tmp (+ ,startt ,half-size)))
+                (declare (type index start-dst start-tmp))
                 (rec ,tmp ,dst ,tmp
                      ,startt
                      start-dst
                      start-tmp
                      ,twiddle
                      ,cooley-tukey)
-                ,(generate-blit half-size
-                                :dst dst :src tmp
-                                :startd 'start-dst :starts startt
-                                :scale (if scalep '.scale2. 1d0))))))
+                (let ,(and scalep '((.scale2. 0d0)))
+                  (declare ,@(and scalep '((type double-float scale2))))
+                  ,(and scalep `(setf .scale2. ,scale))
+                  ,(generate-blit half-size
+                                  :dst dst :src tmp
+                                  :startd 'start-dst :starts startt
+                                  :scale (if scalep '.scale2. 1d0)))))))
 
 (defun gen-rect-fft/large (size1 size2
                              &key (dst 'dst)
