@@ -62,7 +62,8 @@
                                                 (max (abs x) (abs y) 1d0))
                                              1d-5))
                                         (first outputs) output))
-                       do (format t "Mismatch for ~A~%" maker))
+                       do (format t "Mismatch for ~A ~A ~A~%" maker
+                                  (length base) (length output)))
                cycles)))
       (mapcar #'min (run-it) (run-it)))))
 
@@ -106,7 +107,15 @@
       (funcall fft dst src tmp twiddle ck))))
 
 (defun make-large-fft (n &optional (lower 'gen-fft/medium))
-  (let* ((fft (compile nil `(lambda (dst src tmp twiddle ck)
+  (let* ((size1 (ash 1 (truncate (integer-length (1- n))
+                                2)))
+         (size2 (/ n size1))
+         (transpose (compile nil `(lambda (vec tmp)
+                                    (declare (type complex-sample-array vec tmp)
+                                             (optimize speed (safety 0)))
+                                    ,(generate-transpose size2 size1 nil
+                                                         :vecs 0 :tmps 0))))
+         (fft (compile nil `(lambda (dst src tmp twiddle ck)
                               (declare (type complex-sample-array dst src
                                              tmp twiddle ck)
                                        (ignorable twiddle tmp)
@@ -125,7 +134,14 @@
          (tmp     (make-array n :element-type 'complex-sample)))
     (declare (type function fft))
     (lambda (src)
-      (funcall fft dst src tmp twiddle ck))))
+      (declare (type complex-sample-array src))
+      (let ((src (make-array n :element-type 'complex-sample
+                               :initial-contents src)))
+        (funcall transpose src tmp)
+        (funcall fft dst src
+                 tmp twiddle ck)
+        (funcall transpose dst tmp)
+        dst))))
 
 (defvar *runs* '(((2 5) make-bordeaux-fft make-small-fft)
                  ((6 7) make-bordeaux-fft make-small-fft
