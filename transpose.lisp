@@ -3,6 +3,7 @@
 
 
 (defconstant +transpose-base-size+ (ash 1 5))
+(defconstant +transpose-blocking-factor+ 4)
 
 (declaim (inline %transpose! %transpose-into))
 
@@ -172,8 +173,10 @@
                                          (twiddle nil)
                                          (twiddle-start 0)
                                          (scale   1d0)
-                                         (blocking-factor 4))
+                                         (blocking-factor +transpose-blocking-factor+))
   (declare (ignore tmp tmps))
+  (assert (<= blocking-factor size))
+  (assert (zerop (mod size blocking-factor)))
   (flet ((emit-swap (x y offset)
            `(let ((x (scale (%twiddle ,x ,twiddle ,offset)
                             ,scale))
@@ -277,7 +280,7 @@
                                      (startd 0)
                                      (starts 0)
                                      (base-size +transpose-base-size+)
-                                     (blocking-factor 4))
+                                     (blocking-factor +transpose-blocking-factor+))
   (assert (<= blocking-factor size))
   (assert (zerop (mod size blocking-factor)))
   `(labels ((rec (size startd starts)
@@ -322,7 +325,7 @@
                              (twiddle nil)
                              (twiddle-start 0)
                              (scale   1d0)
-                             (blocking-factor 4))
+                             (blocking-factor +transpose-blocking-factor+))
   (assert (<= blocking-factor size))
   (assert (zerop (mod size blocking-factor)))
   `(loop for i    of-type index below ,size by ,blocking-factor
@@ -352,7 +355,7 @@
                              (twiddle nil)
                              (twiddle-start 0)
                              (scale   1d0)
-                             (blocking-factor 4)
+                             (blocking-factor +transpose-blocking-factor+)
                            &aux (total (* size1 size2)))
   (if (= size1 size2)
       (cond (copy
