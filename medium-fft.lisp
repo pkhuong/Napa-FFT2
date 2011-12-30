@@ -1,4 +1,4 @@
-(defconstant +default-blocking-factor+ 4)
+(defconstant +medium-fft-blocking-factor+ 4)
 
 (defun gen-simple-fft/medium (size
                               &key (dst 'dst)
@@ -12,7 +12,7 @@
                                 (scale 1d0)
                                 (twiddle 'twiddle)
                                 (cooley-tukey 'cooley-tukey)
-                                (blocking-factor +default-blocking-factor+))
+                                (blocking-factor +medium-fft-blocking-factor+))
   (assert (evenp (integer-length (1- size))))
   (assert (= 1 strided))
   (let ((half-size (ash 1 (truncate (integer-length (1- size))
@@ -90,7 +90,7 @@
                                  (scale 1d0)
                                  (twiddle 'twiddle)
                                  (cooley-tukey 'cooley-tukey)
-                                 (blocking-factor +default-blocking-factor+))
+                                 (blocking-factor +medium-fft-blocking-factor+))
   (let* ((size1 (ash 1 (truncate (integer-length (1- size))
                                  2)))
          (size2 (/ size size1)))
@@ -185,7 +185,7 @@
                          (scale  1d0)
                          (twiddle 'twiddle)
                          (cooley-tukey 'cooley-tukey)
-                         (blocking-factor +default-blocking-factor+))
+                         (blocking-factor +medium-fft-blocking-factor+))
   (declare (ignore dst src tmp
                    startd starts startt
                    strides
@@ -209,11 +209,11 @@
                                           :cooley-tukey 'ck
                                           :blocking-factor 1)))
 
-(let ((twiddle (bordeaux-fft::make-twiddle-factors 64 1))
+(let ((twiddle (bordeaux-fft::make-twiddle-factors 1024 1))
       (ck-factors (make-all-factors (integer-length (1- 4096)) 1))
       (src *vec*)
       (dst (make-array 4096 :element-type 'complex-sample))
-      (tmp (make-array 4096 :element-type 'complex-sample)))
-  (dotimes (i 10 (prog1 nil (setf *x* dst)))
+      (tmp (make-array 8192 :element-type 'complex-sample)))
+  (dotimes (i 1 (prog1 nil (setf *x* dst)))
     (time (funcall * dst src tmp twiddle ck-factors))))
 ||#
