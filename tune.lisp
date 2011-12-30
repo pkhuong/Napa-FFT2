@@ -52,6 +52,7 @@
                                                            inputs)
                                       (push dst outputs)
                                       cycles))))
+               #+nil
                (loop with base = (first outputs)
                      for maker in (rest makers)
                      for output in (rest outputs)
@@ -131,17 +132,19 @@
          (twiddle (make-twiddle-factors n 1)) ;; only need sqrt
          (ck      (make-all-factors (integer-length (1- n)) 1))
          (dst     (make-array n :element-type 'complex-sample))
+         (src2    (make-array n :element-type 'complex-sample))
          (tmp     (make-array n :element-type 'complex-sample)))
-    (declare (type function fft))
+    (declare (type function fft)
+             (ignorable src2))
     (lambda (src)
       (declare (type complex-sample-array src))
-      (let ((src (make-array n :element-type 'complex-sample
-                               :initial-contents src)))
-        (funcall transpose src tmp)
-        (funcall fft dst src
-                 tmp twiddle ck)
-        (funcall transpose dst tmp)
-        dst))))
+      #+nil(replace src2 src)
+      #+nil
+      (funcall transpose src tmp)
+      (funcall fft dst src
+               tmp twiddle ck)
+      #+nil(funcall transpose dst tmp)
+      dst)))
 
 (defvar *runs* '(((2 5) make-bordeaux-fft make-small-fft)
                  ((6 7) make-bordeaux-fft make-small-fft
