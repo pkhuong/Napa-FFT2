@@ -3,18 +3,21 @@
            (type function function)
            (type index block-size))
   (let* ((len   (length instances))
-         (times (make-array (ceiling len block-size))))
+         (times (make-array (ceiling len block-size)))
+         last)
     (loop for i below len by block-size
           for j upfrom 0
           for last of-type index = (min len (+ i block-size))
-          for time = (nth-value
-                      1 (sb-vm::with-cycle-counter
-                          (loop for i from i below last
-                                do (funcall function (aref instances j)))))
-          do (setf (aref times j) (/ (float time 1d0)
-                                     (- last i))))
+          do (multiple-value-bind (value count)
+                 (sb-vm::with-cycle-counter
+                   (loop for i from i below last
+                         do (funcall function (aref instances j))))
+               (setf (aref times j) (/ (float time 1d0)
+                                       (- last i))
+                     last           value)))
     (sort times #'<)
-    (aref times (truncate (length times) 20))))
+    (values (aref times (truncate (length times) 20))
+            last)))
 
 (defun make-inputs (size)
   (let ((count (max 2 (truncate (ash 32 20) ;; at least 32 MB
@@ -34,11 +37,25 @@
                             (apply (first maker) n (rest maker))))
                       makers)))
     (flet ((run-it ()
-             (loop with inputs = (make-inputs n)
-                   for fun in funs
-                   collect (run-all-instances fun
-                                              block-size
-                                              inputs))))
+             (let* ((outputs '())
+                    (cycles
+                      (loop with inputs = (make-inputs n)
+                            for fun in funs
+                            collect (multiple-value-bind (cycles dst)
+                                        (run-all-instances fun
+                                                           block-size
+                                                           inputs)
+                                      (push dst outputs)
+                                      cycles))))
+               (loop for maker in makers
+                     for output in (rest outputs)
+                     unless (every (lambda (x y)
+                                     (< (/ (abs (- x y))
+                                           (max x y 1d0))
+                                        1d-5))
+                                   (first outputs) output)
+                       do (format t "Mismatch for ~A~%" maker))
+               cycles)))
       (mapcar #'min (run-it) (run-it)))))
 
 (defun make-bordeaux-fft (n)
