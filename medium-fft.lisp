@@ -209,7 +209,7 @@
                                           :cooley-tukey 'ck
                                           :blocking-factor 1)))
 
-(let ((twiddle (bordeaux-fft::make-twiddle-factors 1024 1))
+(let ((twiddle (make-twiddle-factors 1024 1))
       (ck-factors (make-all-factors (integer-length (1- 4096)) 1))
       (src *vec*)
       (dst (make-array 4096 :element-type 'complex-sample))

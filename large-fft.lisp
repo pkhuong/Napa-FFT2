@@ -160,7 +160,7 @@
   (let* ((size1 (ash 1 (truncate (integer-length (1- size))
                                  2)))
          (size2 (/ size size1))
-         (twiddle (bordeaux-fft::make-twiddle-factors size2 1))
+         (twiddle (make-twiddle-factors size2 1))
          (ck      (make-all-factors (integer-length (1- size)) 1))
          (tmp     (make-array size :element-type 'complex-sample))
          (dst     (make-array size :element-type 'complex-sample)))
