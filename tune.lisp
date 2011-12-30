@@ -4,17 +4,19 @@
            (type index block-size))
   (let* ((len   (length instances))
          (times (make-array (ceiling len block-size)))
-         last)
+         last-value)
     (loop for i below len by block-size
           for j upfrom 0
           for last of-type index = (min len (+ i block-size))
           do (multiple-value-bind (value count)
                  (sb-vm::with-cycle-counter
-                   (loop for i from i below last
-                         do (funcall function (aref instances j))))
+                   (let (dst)
+                     (loop for i from i below last
+                           do (setf dst (funcall function (aref instances j)))
+                           finally (return dst))))
                (setf (aref times j) (/ (float time 1d0)
                                        (- last i))
-                     last           value)))
+                     last-value     value)))
     (sort times #'<)
     (values (aref times (truncate (length times) 20))
             last)))
