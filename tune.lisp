@@ -22,13 +22,15 @@
             last-value)))
 
 (defun make-inputs (size)
-  (let ((count (max 2 (truncate (ash 32 20) ;; at least 32 MB
+  (let ((count (max 2 (truncate (ash 256 20) ;; at least 256 MB
                                 (* size 16)))))
     (map-into (make-array count)
               (let ((count 0))
                 (lambda ()
-                  (fill (make-array size :element-type 'complex-sample)
-                        (complex (incf count) 0d0)))))))
+                  (incf count)
+                  (map-into (make-array size :element-type 'complex-sample)
+                            (lambda ()
+                              (complex (random 1d0) count))))))))
 
 (defun time-inputs (makers n &optional (block-size 16))
   (when (atom makers)
@@ -127,7 +129,7 @@
                     make-medium-fft
                     (make-large-fft gen-fft/small)
                     make-large-fft)
-                 ((21 24) make-bordeaux-fft
+                 ((21 25) make-bordeaux-fft
                     make-medium-fft
                     (make-large-fft gen-fft/small)
                     make-large-fft)))
@@ -139,7 +141,8 @@
                      (first span)))
           (last   (if (atom span)
                       span
-                      (second span))))
+                      (second span)))
+          (*print-pretty* nil))
       (loop for size from first upto last
             do (format t "~A \"~A\" ~{~10,1,F ~}~%" size specs
                        (time-inputs specs (ash 1 size)))
