@@ -9,8 +9,11 @@
                     (starts 'starts)
                     (strides 1)
                     (twiddle 'twiddle)
-                    (scale   1d0))
-  (declare (ignore strided strides twiddle))
+                    (scale   1d0)
+                    tmp startt
+                    cooley-tukey)
+  (declare (ignore strided strides twiddle cooley-tukey
+                   tmp startt))
   `(progn
      (setf (ref ,dst ,startd) (scale (ref ,src ,starts)
                                      ,scale))
@@ -23,8 +26,10 @@
                     (starts 'starts)
                     (strides 1)
                     (twiddle 'twiddle)
-                    (scale   1d0))
-  (declare (ignore twiddle))
+                    (scale   1d0)
+                    tmp startt
+                    cooley-tukey)
+  (declare (ignore twiddle cooley-tukey tmp startt))
   `(let ((s0 (scale (ref ,src ,starts) ,scale))
          (s1 (scale (ref ,src (+ ,starts ,strides)) ,scale)))
      (setf (ref ,dst              ,startd) (+ s0 s1)
@@ -40,8 +45,10 @@
                     (starts 'starts)
                     (strides 1)
                     (twiddle 'twiddle)
-                    (scale   1d0))
-  (declare (ignore twiddle))
+                    (scale   1d0)
+                    tmp startt
+                    cooley-tukey)
+  (declare (ignore twiddle cooley-tukey tmp startt))
   `(macrolet ((@src (&optional (index 0))
                 `(scale (ref ,',src (+ ,',starts (* ,index ,',strides)))
                         ,',scale))
@@ -68,8 +75,10 @@
                     (starts 'starts)
                     (strides 1)
                     (twiddle 'twiddle)
-                    (scale  1d0))
-  (declare (ignore twiddle))
+                    (scale  1d0)
+                    tmp startt
+                    cooley-tukey)
+  (declare (ignore twiddle cooley-tukey tmp startt))
   `(macrolet ((@src (&optional (index 0))
                 `(scale (ref ,',src (+ ,',starts (* ,index ,',strides)))
                         ,',scale))
@@ -209,7 +218,10 @@
                         (starts 'starts)
                         (strides 1)
                         (twiddle 'twiddle)
-                        (scale 1d0))
+                        (scale 1d0)
+                        tmp startt
+                        cooley-tukey)
+  (declare (ignore cooley-tukey tmp startt))
   (check-type size (integer 1))
   (case size
     (1
