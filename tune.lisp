@@ -33,11 +33,12 @@
 (defun time-inputs (makers n &optional (block-size 16))
   (when (atom makers)
     (setf makers (list makers)))
-  (let ((funs (mapcar (lambda (maker)
+  (let ((funs (let ((*error-output* (make-broadcast-stream)))
+                (mapcar (lambda (maker)
                         (if (atom maker)
                             (funcall maker n)
                             (apply (first maker) n (rest maker))))
-                      makers)))
+                      makers))))
     (flet ((run-it ()
              (let* ((outputs '())
                     (cycles
@@ -53,7 +54,7 @@
                      for output in (rest outputs)
                      unless (every (lambda (x y)
                                      (< (/ (abs (- x y))
-                                           (max x y 1d0))
+                                           (max (abs x) (abs y) 1d0))
                                         1d-5))
                                    (first outputs) output)
                        do (format t "Mismatch for ~A~%" maker))
@@ -117,3 +118,29 @@
     (declare (type function fft))
     (lambda (src)
       (funcall fft dst src tmp twiddle ck))))
+
+(defvar *runs* '(((2 5) make-bordeaux-fft make-small-fft)
+                 ((6 7) make-bordeaux-fft make-small-fft
+                    make-medium-fft
+                    (make-large-fft gen-fft/small))
+                 ((8 20) make-bordeaux-fft make-small-fft
+                    make-medium-fft
+                    (make-large-fft gen-fft/small)
+                    make-large-fft)
+                 ((21 24) make-bordeaux-fft
+                    make-medium-fft
+                    (make-large-fft gen-fft/small)
+                    make-large-fft)))
+
+(defun execute-runs (&optional (runs *runs*))
+  (loop for (span . specs) in runs do
+    (let ((first (if (atom span)
+                     span
+                     (first span)))
+          (last   (if (atom span)
+                      span
+                      (second span))))
+      (loop for size from first upto last
+            do (format t "~A \"~A\" ~{~10,1,F ~}~%" size specs
+                       (time-inputs specs (ash 1 size)))
+            do (gc :full t)))))
