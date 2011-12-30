@@ -8,21 +8,23 @@
                                (scale  1d0)
                                (twiddle 'twiddle)
                                (cooley-tukey 'cooley-tukey)
+                               (lower 'gen-fft/medium)
                                &aux (scalep (not (onep scale)))
                                  (size (* half-size half-size)))
   `(flet ((rec (dst src tmp startd starts startt
                 twiddle ck)
             (declare (type complex-sample-array dst src tmp)
                      (type index startd starts startt)
-                     (type complex-sample-array twiddle ck))
-            ,(gen-fft/medium half-size :dst 'dst
-                                       :src 'src
-                                       :tmp 'tmp
-                                       :startd 'startd
-                                       :starts 'starts
-                                       :startt 'startt
-                                       :twiddle 'twiddle
-                                       :cooley-tukey 'ck)))
+                     (type complex-sample-array twiddle ck)
+                     (ignorable twiddle tmp startt ck))
+            ,(funcall lower half-size :dst 'dst
+                                      :src 'src
+                                      :tmp 'tmp
+                                      :startd 'startd
+                                      :starts 'starts
+                                      :startt 'startt
+                                      :twiddle 'twiddle
+                                      :cooley-tukey 'ck)))
      (loop for i of-type index below ,size by ,half-size
            do (rec ,dst ,src ,tmp
                    (+ ,startd i)
@@ -63,6 +65,7 @@
                                (scale  1d0)
                                (twiddle 'twiddle)
                                (cooley-tukey 'cooley-tukey)
+                               (lower 'gen-fft/medium)
                                &aux (scalep (not (constantp scale)))
                                  (size (* size1 size2)))
   `(progn
@@ -70,15 +73,16 @@
                       twiddle ck)
               (declare (type complex-sample-array dst src tmp)
                        (type index startd starts startt)
-                       (type complex-sample-array twiddle ck))
-              ,(gen-fft/medium size1 :dst 'dst
-                                     :src 'src
-                                     :tmp 'tmp
-                                     :startd 'startd
-                                     :starts 'starts
-                                     :startt 'startt
-                                     :twiddle 'twiddle
-                                     :cooley-tukey 'ck)))
+                       (type complex-sample-array twiddle ck)
+                       (ignorable twiddle tmp startt ck))
+              ,(funcall lower size1 :dst 'dst
+                                    :src 'src
+                                    :tmp 'tmp
+                                    :startd 'startd
+                                    :starts 'starts
+                                    :startt 'startt
+                                    :twiddle 'twiddle
+                                    :cooley-tukey 'ck)))
        (loop for i of-type index below ,size by ,size1
              do (rec ,dst ,src ,tmp
                      (+ ,startd i)
@@ -95,15 +99,16 @@
                       twiddle ck)
               (declare (type complex-sample-array dst src tmp)
                        (type index startd starts startt)
-                       (type complex-sample-array twiddle ck))
-              ,(gen-fft/medium size2 :dst 'dst
-                                     :src 'src
-                                     :tmp 'dst
-                                     :startd 'startd
-                                     :starts 'starts
-                                     :startt 'startt
-                                     :twiddle 'twiddle
-                                     :cooley-tukey 'ck)))
+                       (type complex-sample-array twiddle ck)
+                       (ignorable twiddle startt ck))
+              ,(funcall lower size2 :dst 'dst
+                                    :src 'src
+                                    :tmp 'dst
+                                    :startd 'startd
+                                    :starts 'starts
+                                    :startt 'startt
+                                    :twiddle 'twiddle
+                                    :cooley-tukey 'ck)))
        (loop for i of-type index below ,size by ,size2
              do (let ((start-dst (+ ,startd i))
                       (start-tmp (+ ,startt ,size2)))
@@ -131,10 +136,12 @@
                         (startt 'startt)
                         (scale  1d0)
                         (twiddle 'twiddle)
-                        (cooley-tukey 'cooley-tukey))
+                        (cooley-tukey 'cooley-tukey)
+                        (lower 'gen-fft/medium))
   (declare (ignore dst src tmp startd starts startt
                    scale twiddle
-                   cooley-tukey))
+                   cooley-tukey
+                   lower))
   (let* ((size1 (ash 1 (truncate (integer-length (1- size))
                                  2)))
          (size2 (/ size size1)))
