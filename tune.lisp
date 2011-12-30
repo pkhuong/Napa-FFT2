@@ -53,7 +53,7 @@
                                       (push dst outputs)
                                       cycles))))
                (loop with base = (first outputs)
-                     for maker in makers
+                     for maker in (rest makers)
                      for output in (rest outputs)
                      unless (and (= (length base)
                                     (length output))
@@ -78,7 +78,8 @@
                                              twiddle)
                                        (ignorable twiddle)
                                        (optimize speed (safety 0)))
-                              ,(gen-fft/small n :startd 0 :starts 0 :twiddle 'twiddle))))
+                              ,(gen-fft/small n :startd 0 :starts 0 :twiddle 'twiddle)
+                              dst)))
          (twiddle (make-twiddle-factors n 1))
          (dst     (make-array n :element-type 'complex-sample)))
     (declare (type function fft))
@@ -94,7 +95,8 @@
                               ,(gen-fft/medium n :startd 0 :starts 0
                                                  :startt 0
                                                  :twiddle 'twiddle
-                                                 :cooley-tukey 'ck))))
+                                                 :cooley-tukey 'ck)
+                              dst)))
          (twiddle (make-twiddle-factors n 1)) ;; only need sqrt
          (ck      (make-all-factors (integer-length (1- n)) 1))
          (dst     (make-array n :element-type 'complex-sample))
@@ -115,7 +117,8 @@
                                               :startt 0
                                               :twiddle 'twiddle
                                               :cooley-tukey 'ck
-                                              :lower lower))))
+                                              :lower lower)
+                              dst)))
          (twiddle (make-twiddle-factors n 1)) ;; only need sqrt
          (ck      (make-all-factors (integer-length (1- n)) 1))
          (dst     (make-array n :element-type 'complex-sample))
