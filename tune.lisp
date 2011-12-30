@@ -19,7 +19,7 @@
                      last-value     value)))
     (sort times #'<)
     (values (aref times (truncate (length times) 20))
-            last)))
+            last-value)))
 
 (defun make-inputs (size)
   (let ((count (max 2 (truncate (ash 32 20) ;; at least 32 MB
@@ -73,7 +73,7 @@
                                        (ignorable twiddle)
                                        (optimize speed (safety 0)))
                               ,(gen-fft/small n :startd 0 :starts 0 :twiddle 'twiddle))))
-         (twiddle (bordeaux-fft::make-twiddle-factors n 1))
+         (twiddle (make-twiddle-factors n 1))
          (dst     (make-array n :element-type 'complex-sample)))
     (declare (type function fft))
     (lambda (src)
@@ -89,7 +89,7 @@
                                                  :startt 0
                                                  :twiddle 'twiddle
                                                  :cooley-tukey 'ck))))
-         (twiddle (bordeaux-fft::make-twiddle-factors n 1)) ;; only need sqrt
+         (twiddle (make-twiddle-factors n 1)) ;; only need sqrt
          (ck      (make-all-factors (integer-length (1- n)) 1))
          (dst     (make-array n :element-type 'complex-sample))
          (tmp     (make-array n :element-type 'complex-sample)))
@@ -110,7 +110,7 @@
                                               :twiddle 'twiddle
                                               :cooley-tukey 'ck
                                               :lower lower))))
-         (twiddle (bordeaux-fft::make-twiddle-factors n 1)) ;; only need sqrt
+         (twiddle (make-twiddle-factors n 1)) ;; only need sqrt
          (ck      (make-all-factors (integer-length (1- n)) 1))
          (dst     (make-array n :element-type 'complex-sample))
          (tmp     (make-array n :element-type 'complex-sample)))

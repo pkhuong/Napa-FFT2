@@ -98,6 +98,23 @@
      (setf ,x y
            ,y x)))
 
+;; cough.
+(defun make-twiddle-factors (size direction)
+  (let ((coeffs (make-array size :element-type 'complex-sample))
+        (coeff #c(1d0 0d0))
+        (factor (exp (/ (* direction -2 pi #c(0 1)) size))))
+    (loop for i of-type fixnum from (ash size -1) below size
+          do (setf (aref coeffs i) coeff)
+          do (setf coeff (* coeff factor)))
+    (do ((src (ash size -1) (ash src -1))
+         (src-size (ash size -1) (ash src-size -1))
+         (dst (ash size -2) (ash dst -1)))
+        ((< src-size 1))
+      (loop for s from src below (+ src src-size) by 2
+            for d upfrom dst
+            do (setf (aref coeffs d) (aref coeffs s))))
+    coeffs))
+
 (defun make-cooley-tukey-factors (size1 size2 direction
                                   &optional (coeffs (make-array
                                                      (* size1 size2)
