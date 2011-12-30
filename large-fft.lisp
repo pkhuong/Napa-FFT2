@@ -148,6 +148,7 @@
     (values (ash 1 (truncate len 2))
             (ash 1 (truncate (1+ len) 2)))))
 
+#+nil
 (defun test-fft (size input)
   (let* ((size1 (ash 1 (truncate (integer-length (1- size))
                                  2)))
